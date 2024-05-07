@@ -1,17 +1,19 @@
 # Copyright (C) 2024 saintnoodle <hi@noodle.moe>
 #
 # This program is free software:
-# you can redistribute it and/or modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation, either version 3 of the License,
-# or (at your option) any later version.
+# you can redistribute it and/or modify it under the terms of the
+# GNU General Public License as published by the Free Software Foundation,
+# either version 3 of the License, or (at your option) any later version.
 #
-# This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
-# without even the implied warrantyof MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warrantyof MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.
 #
 # See the GNU General Public License for more details.
 #
-# You should have received a copy of the GNU General Public License along with this program.
-# If not, see <https://www.gnu.org/licenses/>.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 
 import pytest
 from serial import Serial, SerialException
@@ -210,7 +212,10 @@ def test_get_fan_rpm_success(mock_send_command):
 
 
 def test_get_fan_rpm_all_success(mock_send_command):
-    """Make sure we return an array of ints as expected and the loop runs without obstruction"""
+    """
+    Make sure we return an array of ints as expected
+    and the loop runs without obstruction
+    """
     mock_send_command.return_value = b"\xc0\x00\x00\x01\xc2"
 
     assert GridFanAPI().get_fan_rpm_all() == [450, 450, 450, 450, 450, 450]

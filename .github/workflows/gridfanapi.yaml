@@ -1,0 +1,133 @@
+name: gridfanapi
+on: [push]
+jobs:
+  test:
+    name: Run tests and upload coverage report
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+          cache: "pip"
+      - name: Display Python version
+        run: python -c "import sys; print(sys.version)"
+      - name: Install dependencies
+        run: make update
+      - name: Lint
+        run: flake8 -v
+      - name: Run tests
+        run: pytest --cov=gridfanapi
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v4.2.0
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  build:
+    name: Build package
+    if: github.repository == 'saintnoodle/gridfanapi' && (github.ref == 'refs/heads/main' || github.ref == 'refs/tags')
+    runs-on: ubuntu-latest
+    needs:
+      - test
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+          cache: "pip"
+      - name: Install dependencies
+        run: make update
+      - name: Build
+        run: python3 -m build
+      - name: Store dist packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-dists
+          path: dist/
+
+  publish:
+    name: Publish package to PyPI
+    if: startsWith(github.ref, 'refs/tags')
+    needs:
+      - build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/gridfanapi
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download dist packages
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-dists
+          path: dist/
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  release:
+    name: Create GitHub Release
+    needs:
+      - publish
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Download dist packages
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-dists
+          path: dist/
+      - name: Sign dist
+        uses: sigstore/gh-action-sigstore-python@v2.1.1
+        with:
+          inputs: >-
+            ./dist/*.tar.gz
+            ./dist/*.whl
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create
+          "${{ github.ref_name }}"
+          --repo "${{ github.repository }}"
+          --notes ""
+      - name: Upload sigs to GitHub release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          gh release upload
+          "${{ github.ref_name }}" dist/**
+          --repo "${{ github.repository }}"
+
+  publish-to-test:
+    name: Publish Python 🐍 distribution 📦 to TestPyPI
+    needs:
+      - build
+    runs-on: ubuntu-latest
+
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/gridfanapi
+
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download all the dists
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-dists
+          path: dist/
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/

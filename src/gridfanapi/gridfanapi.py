@@ -1,22 +1,25 @@
 # Copyright (C) 2024 saintnoodle <hi@noodle.moe>
 #
 # This program is free software:
-# you can redistribute it and/or modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation, either version 3 of the License,
-# or (at your option) any later version.
+# you can redistribute it and/or modify it under the terms of the
+# GNU General Public License as published by the Free Software Foundation,
+# either version 3 of the License, or (at your option) any later version.
 #
-# This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
-# without even the implied warrantyof MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warrantyof MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.
 #
 # See the GNU General Public License for more details.
 #
-# You should have received a copy of the GNU General Public License along with this program.
-# If not, see <https://www.gnu.org/licenses/>.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 
 """
 GridFanAPI:
 
-A set of methods for communicating with the NZXT Grid+ v2 fan controller on Linux systems.
+A set of methods for communicating with the NZXT Grid+ v2 fan controller
+on Linux systems.
 
 Refer to readme for appropriate setup.
 """
@@ -43,8 +46,8 @@ class GridFanAPI:
     def __init__(self, device_name="GridPlus0", dir="/dev", log_level="WARNING"):
         """
         Args:
-            device_name (str, optional): The name of the controller (Default: "GridFan0")
-            dir (str, optional): The directory the controller resides (Default: "/dev")
+            device_name (str, optional): Name of the controller (Default: "GridFan0")
+            dir (str, optional): Directory the controller resides (Default: "/dev")
             log_level (str, optional): The log level (Default: "WARNING")
 
         """
@@ -281,7 +284,7 @@ class GridFanAPI:
         and not fan speed percentage.
 
         Args:
-            channel (int): Which fan to get the applied voltage of in percent, between 1-6.
+            channel (int): Which fan to get the applied voltage of in percent, (1-6).
 
         Returns:
             int: The value of the current applied voltage as a percentage.
@@ -375,7 +378,12 @@ class GridFanAPI:
             return True
         elif response:
             raise GridFanError(
-                f"Failed to set fan {channel}; invalid response from controller: {response}",
+                " ".join(
+                    [
+                        f"Failed to set fan {channel};",
+                        f"invalid response from controller: {response}",
+                    ]
+                ),
                 2,
             )
         else:
@@ -444,10 +452,11 @@ class GridFanAPI:
                     self.set_fan(channel, 0)
 
                 # If there's no rpm value and the wattage is 0 whilst the controller
-                # is supplying a high voltage, there is no fan connected or there is a problem.
+                # is supplying a high voltage, there is no fan connected or
+                # there is a problem.
                 #
-                # For those interested, if the controller cannot detect a readout from a fan,
-                # it will supply full power in an attempt to wake the fan up.
+                # For those interested, if the controller cannot detect a readout
+                # from a fan, it will supply full power in an attempt to wake it.
                 # Of course, if there is no fan, there will never be a readout,
                 # so the voltage will be 12 and the rpm will be 0 regardless of
                 # what voltage was set.

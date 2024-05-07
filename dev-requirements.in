@@ -1,5 +1,7 @@
 pip-tools
 black
 flake8
+flake8-black
 pytest
 pytest-mock
+pytest-cov
