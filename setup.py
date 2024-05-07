@@ -7,6 +7,10 @@ import io
 from glob import glob
 from os.path import basename, dirname, join, splitext
 from setuptools import setup, find_packages
+from pathlib import Path
+
+this_dir = Path(__file__).parent
+long_description = (this_dir / "README.md").read_text()
 
 
 def read(*names, **kwargs):
@@ -20,6 +24,8 @@ setup(
     version="0.1.0",
     license="GPL-3.0",
     description="For communicating with the NZXT Grid+ v2 fan controller on Linux",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     author="saintnoodle",
     author_email="hi@noodle.moe",
     packages=find_packages("src"),
@@ -33,8 +39,8 @@ setup(
         "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
         "Operating System :: POSIX :: Linux",
         "Programming Language :: Python",
-        "Programming Language :: Python :: 3.11"
-        "Programming Language :: Python :: 3.12"
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: Implementation :: CPython",
         "Topic :: System :: Hardware :: Universal Serial Bus (USB)",
         "Topic :: Utilities",
