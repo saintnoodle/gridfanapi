@@ -1,5 +1,22 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
+
+# Copyright (C) 2024 saintnoodle <hi@noodle.moe>
+#
+# This program is free software:
+# you can redistribute it and/or modify it under the terms of the
+# GNU General Public License as published by the Free Software Foundation,
+# either version 3 of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warrantyof MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.
+#
+# See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 from __future__ import absolute_import, print_function
 
 
@@ -21,7 +38,7 @@ def read(*names, **kwargs):
 
 setup(
     name="gridfanapi",
-    version="0.1.0",
+    version="1.0.0",
     license="GPL-3.0",
     description="For communicating with the NZXT Grid+ v2 fan controller on Linux",
     long_description=long_description,
@@ -34,7 +51,7 @@ setup(
     include_package_data=True,
     install_requires=["pyserial"],
     classifiers=[
-        "Development Status :: 4 - Beta",
+        "Development Status :: 5 - Production/Stable",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
         "Operating System :: POSIX :: Linux",
