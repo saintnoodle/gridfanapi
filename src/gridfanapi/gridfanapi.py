@@ -24,11 +24,11 @@ on Linux systems.
 Refer to readme for appropriate setup.
 """
 
-from . import util
-from .util import Command, CommandDict, GridFanError
 import serial
 import time
 import logging
+from . import util
+from .util import Command, CommandDict, GridFanError
 
 
 logger = logging.getLogger("gridfanapi")
@@ -129,17 +129,13 @@ class GridFanAPI:
         logger.debug(f"Sending to controller: {write_bytes}")
         try:
             bytes_written = controller.write(write_bytes)
-        except serial.SerialException as e:
-            raise GridFanError(f"Failed to write to controller: {e.strerror}", 1)
+            logger.debug(f"Wrote {bytes_written} bytes.")
 
-        logger.debug(f"Wrote {bytes_written} bytes.")
-
-        try:
             response = controller.read(command.out_size)
             logger.debug(f"Controller responded: {response}")
 
         except serial.SerialException as e:
-            raise GridFanError(f"Failed to read controller: {e.strerror}", 1)
+            raise GridFanError(f"Communication failure: {e.strerror}", 1)
 
         if not len(response) == command.out_size:
             raise GridFanError(f"Unexpected response from controller: {response}", 2)
@@ -186,14 +182,11 @@ class GridFanAPI:
                 time.sleep(0.1)
 
             retry += 1
-            try:
-                if self.ping():
-                    return True
-            except GridFanError as e:
-                logger.warning(e)
+            if self.ping():
+                return True
 
         if retry == 30:
-            logger.error(f"Giving up after {retry} times.")
+            logger.error(f"Giving up after {retry} tries.")
             return False
 
     def get_fan_rpm(self, channel: int):
@@ -351,13 +344,13 @@ class GridFanAPI:
 
         return fan_wattage_list
 
-    def set_fan(self, channel: int, speed: int):
+    def set_fan(self, channel: int, speed: int | float):
         """
         Set the speed of a fan by its ID.
 
         Args:
             channel (int): Which fan to set the speed of, between 1-6.
-            speed (int): The speed to set between 20-100% or 0.
+            speed (int | float): The speed to set between 20-100% or 0.
 
         Returns:
             bool: True if speed successfully set.

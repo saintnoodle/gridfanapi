@@ -142,12 +142,12 @@ def is_valid_channel(channel: int):
         return True
 
 
-def is_valid_speed(speed: int):
+def is_valid_speed(speed: int | float):
     """
     Check if the speed value is valid.
 
     Args:
-        speed (int): The speed to set between 20-100% or 0.
+        speed (int | float): The speed to set between 20-100% or 0.
 
     Raises:
         GridFanError: Do not continue if the speed value is invalid.
@@ -155,14 +155,14 @@ def is_valid_speed(speed: int):
     Returns:
         True
     """
-    if type(speed) is not int:
-        raise GridFanError("Missing arg: speed.", 3)
+    if type(speed) not in (int, float):
+        raise GridFanError(f"Invalid speed type: {speed}", 3)
     elif speed < 0:
         raise GridFanError(
-            f"Invalid speed: {speed}. Speed must be a non-negative number", 3
+            f"Invalid speed: {speed}. Speed must be a non-negative number.", 3
         )
     elif speed > 100:
-        raise GridFanError(f"Invalid speed: {speed}. Speed must be within 0-100", 3)
+        raise GridFanError(f"Invalid speed: {speed}. Speed must be within 0-100.", 3)
     else:
         return True
 

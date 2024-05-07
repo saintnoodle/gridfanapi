@@ -14,16 +14,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-
-import pytest
 from serial import Serial, SerialException
 from gridfanapi import GridFanAPI
 from gridfanapi.util import Command, GridFanError
+import pytest
 
 
 @pytest.fixture
 def mock_serial(mocker):
-    """A mock Serial instance"""
+    """A mock Serial instance."""
     return mocker.patch("serial.Serial", autospec=Serial)
 
 
@@ -57,16 +56,18 @@ def mock_send_command_exception(mocker):
 
 @pytest.fixture
 def mock_fan_voltage(mocker):
+    """Mock get_fan_voltage method."""
     return mocker.patch("gridfanapi.GridFanAPI.get_fan_voltage")
 
 
 @pytest.fixture
 def mock_fan_wattage(mocker):
+    """Mock get_fan_wattage method."""
     return mocker.patch("gridfanapi.GridFanAPI.get_fan_wattage")
 
 
 def test_connect_success(mock_serial):
-    """Just a quick check that the connect function does in fact return correctly"""
+    """Test connect method."""
     assert isinstance(
         GridFanAPI(device_name="mock_device", dir="/dev").connect(), Serial
     )
@@ -78,7 +79,6 @@ def test_connect_success(mock_serial):
 def test_connect_disconnected(mock_serial_exception):
     """
     If the controller doesn't exist, we should expect an exception from Serial.
-    Said exception should be handled and re-raised with GridFanError as code 1.
     """
     gridfan = GridFanAPI("nonexistent_device", "~")
     with pytest.raises(GridFanError) as exc_info:
@@ -88,7 +88,7 @@ def test_connect_disconnected(mock_serial_exception):
 
 
 def test_send_command_success(mock_serial):
-    """Simulate a request to get fan speed from channel 1."""
+    """Test send_command utility."""
     gridfan = GridFanAPI()
     controller = gridfan.connect()
 
@@ -110,10 +110,7 @@ def test_send_command_success(mock_serial):
 
 
 def test_send_command_error(mock_serial):
-    """
-    If the controller responds to a command with its error code "02",
-    an exception should raise with error code 2
-    """
+    """Test send_command utility with an error response from the controller."""
     gridfan = GridFanAPI()
     controller = gridfan.connect()
 
@@ -132,10 +129,7 @@ def test_send_command_error(mock_serial):
 
 
 def test_send_command_no_response(mock_serial):
-    """
-    If the controller doesn't respond or the response is unexpected,
-    an exception should raise with error code 2
-    """
+    """Test send_command utility with no response from the controller."""
     gridfan = GridFanAPI()
     controller = gridfan.connect()
 
@@ -154,7 +148,7 @@ def test_send_command_no_response(mock_serial):
 
 
 def test_send_command_invalid_command(mock_serial):
-    """Test that the command function raises on an invalid command with code 3"""
+    """Test that the send_command utility raises on an invalid command with code 3."""
     invalid_command = "invalid"
     data = "01"
 
@@ -164,11 +158,22 @@ def test_send_command_invalid_command(mock_serial):
     assert exc_info.value.code == 3
 
 
+def test_send_command_invalid_input(mock_serial):
+    """
+    Test that send_command raises an exception if a write command's size is invalid.
+    """
+    command = Command(hex_str="8A", in_size=2, out_size=5)
+    data = ""
+
+    with pytest.raises(GridFanError) as exc_info:
+        GridFanAPI().send_command(command, data)
+
+    assert exc_info.value.code == 4
+    assert "Invalid input size." in exc_info.value.message
+
+
 def test_send_command_serial_error(mock_serial_exception):
-    """
-    Test whether the command function fails successfuly with the correct code
-    when the device is not connected and Serial raises an exception
-    """
+    """Test that send_command utiliy handles a Serial error."""
     command = Command(hex_str="8A", in_size=2, out_size=5)
     data = "01"
 
@@ -178,51 +183,109 @@ def test_send_command_serial_error(mock_serial_exception):
     assert exc_info.value.code == 1
 
 
+def test_send_command_communication_failure(mock_serial):
+    """Test that send_command utility handles a Serial error mid-way."""
+    gridfan = GridFanAPI()
+    controller = gridfan.connect()
+
+    command = Command(hex_str="8A", in_size=2, out_size=5)
+    data = "01"
+
+    controller.write.side_effect = SerialException
+
+    with pytest.raises(GridFanError) as exc_info:
+        gridfan.send_command(command, data)
+
+    assert exc_info.value.code == 1
+    assert "Communication failure:" in exc_info.value.message
+
+
 def test_ping_success(mock_send_command):
-    """The controller responds with "21" on a successful hello command."""
+    """
+    Test ping method.
+
+    The controller responds to a "C0" command with "21".
+    """
 
     mock_send_command.return_value = b"\x21"
 
     assert GridFanAPI().ping() is True
 
 
-def test_ping_error(mock_send_command):
-    """
-    The controller responds with "02" if an error occured.
-    We return True because the controller is alive and will
-    respond correctly to the next command
-
-    The only difference is the log message which warns about the error code.
-    """
+def test_ping_error(mock_send_command, caplog):
+    """Test ping method with error response from controller."""
     mock_send_command.return_value = b"\x02"
     assert GridFanAPI().ping() is True
+    assert "The controller returned an error code, but it responded" in caplog.text
+    assert any(record.levelname == "WARNING" for record in caplog.records)
 
 
 def test_ping_no_response(mock_send_command):
-    """Sometimes the controller doesn't respond."""
+    """Test ping method with no response from controller."""
     mock_send_command.return_value = b""
     assert GridFanAPI().ping() is False
 
 
+def test_ping_exception(mock_send_command, caplog):
+    """Test ping method with an exception."""
+    mock_send_command.side_effect = GridFanError("Test error message", 1)
+
+    ping = GridFanAPI().ping()
+    assert not ping
+    assert "Test error message" in caplog.text
+
+
+def test_init_success(mock_send_command):
+    """Test init method."""
+    api = GridFanAPI()
+    mock_send_command.return_value = b"\x21"  # Mock a successful ping response
+
+    result = api.init()
+
+    assert result is True
+    assert mock_send_command.call_count == 1
+
+
+def test_init_with_ping_failure(mock_send_command_exception, caplog):
+    """Test init method with ping failure."""
+    api = GridFanAPI()
+    mock_send_command_exception.side_effect = GridFanError("Test error message", 1)
+
+    result = api.init()
+
+    assert result is False
+    assert "Test error message" in caplog.text
+    assert any(record.levelname == "ERROR" for record in caplog.records)
+
+
+def test_init_gives_up_after_retry(mock_send_command_exception, mocker, caplog):
+    """Test initialization gives up after retry."""
+    api = GridFanAPI()
+    mock_send_command_exception.side_effect = GridFanError("Test error message", 1)
+
+    result = api.init()
+
+    assert result is False
+    assert "Giving up after 30 tries." in caplog.text
+    assert any(record.levelname == "ERROR" for record in caplog.records)
+
+
 def test_get_fan_rpm_success(mock_send_command):
-    """Make sure we return an int of an expected value."""
+    """Test get_fan_rpm method."""
     mock_send_command.return_value = b"\xc0\x00\x00\x01\xc2"
 
     assert GridFanAPI().get_fan_rpm(1) == 450
 
 
 def test_get_fan_rpm_all_success(mock_send_command):
-    """
-    Make sure we return an array of ints as expected
-    and the loop runs without obstruction
-    """
+    """Test get_fan_rpm_all method."""
     mock_send_command.return_value = b"\xc0\x00\x00\x01\xc2"
 
     assert GridFanAPI().get_fan_rpm_all() == [450, 450, 450, 450, 450, 450]
 
 
 def test_get_fan_rpm_invalid_response(mock_send_command):
-    """If the controller doesn't respond as expected, an exception should be raised"""
+    """Test get_fan_rpm with an invalid response from the controller."""
     mock_send_command.return_value = b""
 
     with pytest.raises(GridFanError) as exc_info:
@@ -232,7 +295,7 @@ def test_get_fan_rpm_invalid_response(mock_send_command):
 
 
 def test_get_fan_voltage_success(mock_send_command):
-    """Test that the voltage is correctly converted and returned."""
+    """Test get_fan_voltage method."""
     # I'm unsure why the last byte is text, but we'll roll with it
     mock_send_command.return_value = b"\xc0\x00\x00\x079"
 
@@ -240,7 +303,7 @@ def test_get_fan_voltage_success(mock_send_command):
 
 
 def test_get_fan_voltage_all_success(mock_send_command):
-    """Make sure we return an array of floats as expected."""
+    """Test get_fan_voltage_all method."""
     mock_send_command.return_value = b"\xc0\x00\x00\x079"
 
     assert GridFanAPI().get_fan_voltage_all() == [
@@ -254,14 +317,14 @@ def test_get_fan_voltage_all_success(mock_send_command):
 
 
 def test_get_fan_percent_success(mock_send_command):
-    """Test that the voltage is correctly converted and returned."""
+    """Test get_fan_percent method."""
     mock_send_command.return_value = b"\xc0\x00\x00\x079"
 
     assert GridFanAPI().get_fan_percent(1) == 56
 
 
 def test_get_fan_percent_all_success(mock_send_command):
-    """Make sure we return an array of ints as expected."""
+    """Test get_fan_percent_all method."""
     mock_send_command.return_value = b"\xc0\x00\x00\x079"
 
     assert GridFanAPI().get_fan_percent_all() == [
@@ -275,14 +338,14 @@ def test_get_fan_percent_all_success(mock_send_command):
 
 
 def test_get_fan_wattage_success(mock_send_command):
-    """Test that the wattage is correctly returned."""
+    """Test get_fan_wattage method."""
     mock_send_command.return_value = b"\xc0\x00\x00\x00\x14"
 
     assert GridFanAPI().get_fan_wattage(1) == 1.4
 
 
 def test_get_fan_wattage_all_success(mock_send_command):
-    """Make sure we return an array of floats as expected."""
+    """Test get_fan_wattage_all method."""
     mock_send_command.return_value = b"\xc0\x00\x00\x00\x14"
 
     assert GridFanAPI().get_fan_wattage_all() == [
@@ -296,23 +359,63 @@ def test_get_fan_wattage_all_success(mock_send_command):
 
 
 def test_set_fan_success(mock_send_command):
-    """A simple test to make sure we get the expected result."""
+    """Test set_fan method."""
+    gridfan = GridFanAPI()
+
     mock_send_command.return_value = b"\01"
 
-    assert GridFanAPI().set_fan(1, 55) is True
+    assert gridfan.set_fan(1, 55) is True
+    mock_send_command.assert_called_once_with(
+        gridfan.COMMAND["SET_FAN"], "01c000000750"
+    )
+
+
+def test_set_fan_success_float(mock_send_command):
+    """Test set_fan method with a float value."""
+    gridfan = GridFanAPI()
+
+    mock_send_command.return_value = b"\01"
+
+    assert gridfan.set_fan(1, 63.66) is True
+    mock_send_command.assert_called_once_with(
+        gridfan.COMMAND["SET_FAN"], "01c000000800"
+    )
 
 
 def test_set_fan_all_success(mock_send_command):
-    """A simple test to make sure we correctly iterate over all the fans."""
+    """Test set_fan_all method."""
     mock_send_command.return_value = b"\01"
 
     assert GridFanAPI().set_fan_all(55) is True
+    assert mock_send_command.call_count == 6
+
+
+def test_set_fan_error(mock_send_command):
+    """Test set_fan method with an error response."""
+    api = GridFanAPI()
+    mock_send_command.return_value = b"\x02"
+
+    with pytest.raises(GridFanError) as exc_info:
+        api.set_fan(1, 50)
+
+    assert exc_info.value.code == 2
+
+
+def test_set_fan_no_response(mock_send_command):
+    """Test set_fan method with no response."""
+    api = GridFanAPI()
+    mock_send_command.return_value = b""
+
+    with pytest.raises(GridFanError) as exc_info:
+        api.set_fan(1, 50)
+
+    assert exc_info.value.code == 1
 
 
 def test_invalid_channel_input(mock_send_command):
     """
-    If an invalid channel is passed to a get/set function,
-    we should raise an arg error code 3 exception.
+    Test channel arg validation with out of range value.
+    We should raise a code 3 exception.
     """
     # If a controller doesn't recognise a request,
     # we will likely timeout before it sends its error code
@@ -323,69 +426,72 @@ def test_invalid_channel_input(mock_send_command):
         GridFanAPI().get_fan_rpm(7)
 
     assert exc_info.value.code == 3
+    assert "Fan channel must be between 1 and 6." in exc_info.value.message
     assert not mock_send_command.called
 
 
 def test_invalid_channel_input_negative(mock_send_command):
-    """The same test as above but with a negative int."""
+    """Test channel arg validation with negative int."""
     mock_send_command.return_value = b""
 
     with pytest.raises(GridFanError) as exc_info:
         GridFanAPI().get_fan_rpm(-1)
 
     assert exc_info.value.code == 3
+    assert "Fan channel must be between 1 and 6." in exc_info.value.message
     assert not mock_send_command.called
 
 
 def test_invalid_channel_input_type(mock_send_command):
-    """The same test as above but with an incorrect type."""
+    """Test channel arg validation with incorrect type."""
     mock_send_command.return_value = b""
 
     with pytest.raises(GridFanError) as exc_info:
         GridFanAPI().get_fan_rpm(False)  # type: ignore
 
     assert exc_info.value.code == 3
+    assert "Fan channel must be an int" in exc_info.value.message
     assert not mock_send_command.called
 
 
 def test_invalid_speed_input(mock_send_command):
-    """
-    A speed value outside of the range of 0-100 should cause
-    an exception to be raised with code 3
-    """
+    """Test speed arg validation."""
+    mock_send_command.return_value = b""
+
     with pytest.raises(GridFanError) as exc_info:
         GridFanAPI().set_fan(1, 150)
 
     assert exc_info.value.code == 3
+    assert "Speed must be within 0-100." in exc_info.value.message
     assert not mock_send_command.called
 
 
 def test_invalid_speed_input_negative(mock_send_command):
-    """
-    A speed value outside of the range of 0-100 should cause
-    an exception to be raised with code 3
-    """
+    """Test speed arg validation with negative int."""
+    mock_send_command.return_value = b""
+
     with pytest.raises(GridFanError) as exc_info:
         GridFanAPI().set_fan(1, -1)
 
     assert exc_info.value.code == 3
+    assert "Speed must be a non-negative number." in exc_info.value.message
     assert not mock_send_command.called
 
 
 def test_invalid_speed_input_type(mock_send_command):
-    """
-    A speed value outside that isn't an int should cause
-    an exception to be raised with code 3
-    """
+    """Test speed arg validation with incorrect type."""
+    mock_send_command.return_value = b""
+
     with pytest.raises(GridFanError) as exc_info:
         GridFanAPI().set_fan(1, False)  # type: ignore
 
     assert exc_info.value.code == 3
+    assert "Invalid speed type" in exc_info.value.message
     assert not mock_send_command.called
 
 
 def test_is_connected(mock_fan_voltage, mock_fan_wattage):
-    """Fan connected condition"""
+    """Test is_connected method"""
     mock_fan_voltage.return_value = 6
     mock_fan_wattage.return_value = 0.4
 
@@ -393,7 +499,7 @@ def test_is_connected(mock_fan_voltage, mock_fan_wattage):
 
 
 def test_is_connected_no_fan(mock_fan_voltage, mock_fan_wattage):
-    """Fan not connected condition"""
+    """Test is_connected with no fan connected"""
     mock_fan_voltage.return_value = 11.8
     mock_fan_wattage.return_value = 0
 
@@ -432,6 +538,12 @@ def test_is_connected_off(mocker, mock_fan_voltage, mock_fan_wattage):
 
 
 def test_is_connected_off_no_fan(mocker, mock_fan_voltage, mock_fan_wattage):
+    """
+    Make sure that if the fan was off before,
+    it gets turned on and back off during the check.
+
+    In this case, there is no fan connected so only the applied voltage will change.
+    """
     mock_set_fan = mocker.patch(
         "gridfanapi.GridFanAPI.set_fan",
     )
@@ -460,7 +572,10 @@ def test_is_connected_off_no_fan(mocker, mock_fan_voltage, mock_fan_wattage):
 
 
 def test_is_connected_no_response(mocker, mock_send_command):
-    """Make sure this function retries 3 times, attempting error recovery."""
+    """
+    Test is_connected with no response from controller.
+    It should attempt error recovery.
+    """
     mock_init = mocker.patch("gridfanapi.GridFanAPI.init")
     mock_send_command.return_value = b""
 
@@ -470,3 +585,21 @@ def test_is_connected_no_response(mocker, mock_send_command):
     assert mock_init.call_count == 2
     assert mock_send_command.call_count == 3
     assert exc_info.value.code == 2
+
+
+def test_is_connected_with_recovery_and_response(
+    mocker, mock_fan_voltage, mock_fan_wattage
+):
+    """Test is_connected method with error recovery and finally gets a response."""
+    mock_init = mocker.patch("gridfanapi.GridFanAPI.init")
+    mock_init.return_value = True
+
+    mock_fan_voltage.side_effect = [6, GridFanError("Test error message", 1), 6]
+    mock_fan_wattage.side_effect = [GridFanError("Test error message", 1), 0.4, 0.4]
+
+    result = GridFanAPI().is_fan_connected(1)
+
+    assert result is True
+    assert mock_init.call_count == 2
+    assert mock_fan_voltage.call_count == 3
+    assert mock_fan_wattage.call_count == 2
